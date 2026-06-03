@@ -290,9 +290,9 @@ const SALON_CONFIG = {
 
   // ── API ──────────────────────────────────────────────────────────────────
   // OPCJA A – proxy Cloudflare Workers (ZALECANE, klucz ukryty):
-  proxyUrl:      "https://gemini-proxy2.kaczor237fb.workers.dev",   // np. "https://gemini-proxy.twoja.workers.dev"
+  proxyUrl:      "https://-proxy2.kaczor237fb.workers.dev",   // np. "https://-proxy.twoja.workers.dev"
   // OPCJA B – klucz bezpośrednio (tylko na demo/localhost, NIE na produkcji):
-  geminiKeyDev:  "",   // wklej klucz tylko lokalnie
+  KeyDev:  "",   // wklej klucz tylko lokalnie
 
   // ── Oferta salonu ────────────────────────────────────────────────────────
   // Dodaj lub usuń zabiegi. Format: { name, price, duration, description }
@@ -503,7 +503,7 @@ async function callGemini(msgs) {
   const C = SALON_CONFIG;
   const url = C.proxyUrl
     ? C.proxyUrl           // produkcja – proxy Workers
-    : `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${C.geminiKeyDev}`;
+    : `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${C.geminiKeyDev}`;
 
   const body = {
     system_instruction: { parts: [{ text: window.SYSTEM_PROMPT }] },
