@@ -503,7 +503,7 @@ async function callGemini(msgs) {
   const C = SALON_CONFIG;
   const url = C.proxyUrl
     ? C.proxyUrl           // produkcja – proxy Workers
-    : `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${C.geminiKeyDev}`;
+    : `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${C.geminiKeyDev}`;
 
   const body = {
     system_instruction: { parts: [{ text: window.SYSTEM_PROMPT }] },
