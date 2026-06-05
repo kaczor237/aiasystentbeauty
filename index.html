@@ -286,7 +286,7 @@ const SALON_CONFIG = {
 
   // URL proxy Cloudflare Workers
   proxyUrl:      "https://gemini-proxy2.kaczor237fb.workers.dev",   
-  model:         "meta-llama/llama-3.2-3b-instruct:free",
+  model:         "google/gemini-2.5-flash:free",
 
   services: [
     { name: "Oczyszczanie wodorowe",      price: 180, duration: "60 min", description: "Głębokie oczyszczanie porów, nawilżenie, redukcja niedoskonałości." },
@@ -468,7 +468,7 @@ async function callGemini(msgs) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: C.model || 'meta-llama/llama-3.2-3b-instruct:free',
+      model: C.model || 'google/gemini-2.5-flash:free',
       messages: messagesToSend,
       max_tokens: 350,
       temperature: 0.75
