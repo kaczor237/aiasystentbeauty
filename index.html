@@ -232,4 +232,346 @@
     max-height: 100px;
     transition: border-color 0.2s;
   }
-  #wgTextarea:focus {
+  #wgTextarea:focus { border-color: var(--primary); }
+  #wgTextarea::placeholder { color: var(--muted); }
+  #wgSend {
+    width: 40px; height: 40px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    border: none; cursor: pointer;
+    display:flex; align-items:center; justify-content:center;
+    transition: opacity 0.2s, transform 0.15s;
+    flex-shrink:0;
+  }
+  #wgSend:hover { opacity:0.85; transform:scale(1.05); }
+  #wgSend:disabled { opacity:0.35; cursor:not-allowed; transform:none; }
+  #wgSend svg { fill: white; }
+
+  /* ── DEMO NOTICE ── */
+  .demo-notice {
+    background: #fffbec;
+    border-bottom: 1px solid #f0e0a0;
+    padding: 8px 14px;
+    font-size: 11px;
+    color: #8a7020;
+    text-align: center;
+    flex-shrink: 0;
+  }
+
+  @media (max-width: 420px) {
+    #chatWidget { width: calc(100vw - 24px); right: 12px; bottom: 84px; }
+    #chatToggle { right: 12px; bottom: 12px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════════════════════════════════════════
+     KONFIGURACJA SALONU
+════════════════════════════════════════════════════════════════════════ -->
+<script>
+const SALON_CONFIG = {
+  name:          "Lumière Beauty",          
+  city:          "Kraków",
+  address:       "ul. Floriańska 12",
+  phone:         "123 456 789",
+  email:         "kontakt@salon.pl",
+  website:       "https://salon.pl",
+  privacyUrl:    "https://salon.pl/polityka-prywatnosci",  
+
+  botName:       "Sophia",                  
+  botEmoji:      "🌸",                      
+  colorPrimary:  "#c9907a",                 
+  colorDark:     "#a8705c",                 
+
+  // URL proxy Cloudflare Workers
+  proxyUrl:      "https://gemini-proxy2.kaczor237fb.workers.dev",   
+  model:         "meta-llama/llama-3.2-3b-instruct:free",
+
+  services: [
+    { name: "Oczyszczanie wodorowe",      price: 180, duration: "60 min", description: "Głębokie oczyszczanie porów, nawilżenie, redukcja niedoskonałości." },
+    { name: "Peeling kawitacyjny",        price: 150, duration: "45 min", description: "Złuszczanie martwego naskórka, wygładzenie i rozświetlenie cery." },
+    { name: "Mikrodermabrazja diamentowa",price: 200, duration: "60 min", description: "Redukcja blizn, przebarwień i płytkich zmarszczek." },
+    { name: "Masaż twarzy Kobido",        price: 220, duration: "75 min", description: "Japoński lifting twarzy, relaksacja mięśni, efekt młodości." },
+    { name: "Laminowanie rzęs",           price: 160, duration: "90 min", description: "Podkręcenie i odżywienie rzęs bez sztucznych przedłużeń." },
+    { name: "Lifting brwi + henna pudrowa",price: 120, duration: "60 min", description: "Regulacja, lifting i koloryzacja brwi metodą pudrową." },
+    { name: "Manicure hybrydowy",         price: 130, duration: "75 min", description: "Lakier hybrydowy z pielęgnacją płytek i skórek." },
+    { name: "Pedicure SPA",               price: 150, duration: "90 min", description: "Kompleksowa pielęgnacja stóp z kąpielą i masażem." },
+  ],
+
+  extraInfo: "Salon czynny: pon-pt 9:00-20:00, sob 9:00-16:00. Przyjmujemy płatności kartą i gotówką. Parking bezpłatny przed salonem. Pierwsza wizyta -10%."
+};
+</script>
+
+<!-- Floating button -->
+<button id="chatToggle" aria-label="Otwórz konsultanta AI">
+  <span id="toggleEmoji">🌸</span>
+  <div class="notif-dot" id="notifDot"></div>
+</button>
+
+<!-- Widget -->
+<div id="chatWidget" role="dialog" aria-label="Konsultant AI">
+  <div class="demo-notice" id="demoNotice">
+    🔧 DEMO – usuń ten pasek w wersji produkcyjnej
+  </div>
+
+  <div class="wg-header">
+    <div class="wg-avatar" id="headerEmoji">🌸</div>
+    <div class="wg-info">
+      <div class="wg-name" id="headerName">Sophia</div>
+      <div class="wg-sub">Konsultantka AI • Online</div>
+    </div>
+    <button class="wg-close" id="chatClose" aria-label="Zamknij">✕</button>
+  </div>
+
+  <div class="wg-messages" id="wgMessages"></div>
+  <div class="wg-quick" id="wgQuick" style="display:none"></div>
+
+  <!-- RODO consent -->
+  <div class="wg-consent" id="wgConsent">
+    <p>Aby przekazać Twoje dane do salonu, potrzebujemy Twojej zgody:</p>
+    <label>
+      <input type="checkbox" id="consentCheck">
+      <span>Wyrażam zgodę na przetwarzanie moich danych osobowych (imię, numer telefonu) przez <strong id="consentSalonName"></strong> w celu umówienia wizyty. <a id="consentPrivacyLink" href="#" target="_blank">Polityka prywatności</a>.</span>
+    </label>
+    <button id="consentBtn">Potwierdzam i podaję dane kontaktowe</button>
+  </div>
+
+  <div class="wg-input">
+    <textarea id="wgTextarea" placeholder="Napisz wiadomość..." rows="1" disabled></textarea>
+    <button id="wgSend" disabled aria-label="Wyślij">
+      <svg width="16" height="16" viewBox="0 0 24 24"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg>
+    </button>
+  </div>
+</div>
+
+<script>
+// ── Aplikuj konfigurację do CSS variables i DOM ───────────────────────────
+(function applyConfig() {
+  const C = SALON_CONFIG;
+  document.documentElement.style.setProperty('--primary', C.colorPrimary);
+  document.documentElement.style.setProperty('--primary-dark', C.colorDark);
+  document.documentElement.style.setProperty('--primary-light', C.colorPrimary + '22');
+
+  document.getElementById('pageTitle').textContent = `AI Konsultantka – ${C.name}`;
+  document.getElementById('headerEmoji').textContent = C.botEmoji;
+  document.getElementById('toggleEmoji').textContent = C.botEmoji;
+  document.getElementById('headerName').textContent = `${C.botName} – ${C.name}`;
+  document.getElementById('consentSalonName').textContent = C.name;
+  document.getElementById('consentPrivacyLink').href = C.privacyUrl;
+
+  const serviceList = C.services.map(s => `• ${s.name} – ${s.price} zł, ${s.duration}`).join('\n');
+
+  window.SYSTEM_PROMPT = "Jesteś " + C.botName + " - profesjonalną konsultantką AI salonu " + C.name + " w " + C.city + ". Oferta:\n" + serviceList + "\nStyl: Ciepły, pomocny, max 3 zdania. Gdy klient chce rezerwować, użyj tokenu [COLLECT_CONTACT].";
+})();
+
+// ── State ─────────────────────────────────────────────────────────────────
+let history = [];
+let isLoading = false;
+let consentGiven = false;
+let waitingForContact = false;
+
+// ── DOM refs ──────────────────────────────────────────────────────────────
+const widget    = document.getElementById('chatWidget');
+const toggle    = document.getElementById('chatToggle');
+const closeBtn  = document.getElementById('chatClose');
+const messages  = document.getElementById('wgMessages');
+const quick     = document.getElementById('wgQuick');
+const textarea  = document.getElementById('wgTextarea');
+const sendBtn   = document.getElementById('wgSend');
+const consent   = document.getElementById('wgConsent');
+const consentCk = document.getElementById('consentCheck');
+const consentBt = document.getElementById('consentBtn');
+const notifDot  = document.getElementById('notifDot');
+
+// ── Toggle widget ─────────────────────────────────────────────────────────
+toggle.addEventListener('click', () => {
+  const isOpen = widget.classList.toggle('open');
+  toggle.setAttribute('aria-expanded', isOpen);
+  notifDot.style.display = 'none';
+  if (isOpen && history.length === 0) startChat();
+});
+closeBtn.addEventListener('click', () => { widget.classList.remove('open'); toggle.setAttribute('aria-expanded', false); });
+
+// ── Consent checkbox ──────────────────────────────────────────────────────
+consentCk.addEventListener('change', () => {
+  consentBt.classList.toggle('active', consentCk.checked);
+});
+consentBt.addEventListener('click', () => {
+  if (!consentCk.checked) return;
+  consentGiven = true;
+  consent.style.display = 'none';
+  waitingForContact = true;
+  addMsg('bot', "Dziękuję! Podaj mi swoje imię i numer telefonu, a pracownik salonu skontaktuje się z Tobą 🌸");
+  enableInput("Np. Anna, 600 123 456");
+});
+
+// ── Messages ──────────────────────────────────────────────────────────────
+function addMsg(role, text) {
+  const wrap = document.createElement('div');
+  wrap.className = `msg ${role}`;
+  const av = document.createElement('div');
+  av.className = 'msg-av';
+  av.textContent = role === 'bot' ? SALON_CONFIG.botEmoji : 'Ty';
+  const bubble = document.createElement('div');
+  bubble.className = 'msg-b';
+  bubble.innerHTML = text.replace(/\n/g, '<br>').replace(/\[COLLECT_CONTACT\]/g, '');
+  wrap.appendChild(av);
+  wrap.appendChild(bubble);
+  messages.appendChild(wrap);
+  messages.scrollTop = messages.scrollHeight;
+}
+
+function showTyping() {
+  const wrap = document.createElement('div');
+  wrap.className = 'msg bot'; wrap.id = 'typing';
+  wrap.innerHTML = `<div class="msg-av">${SALON_CONFIG.botEmoji}</div><div class="msg-b typing-b"><span></span><span></span><span></span></div>`;
+  messages.appendChild(wrap);
+  messages.scrollTop = messages.scrollHeight;
+}
+function removeTyping() { const t = document.getElementById('typing'); if(t) t.remove(); }
+
+function setQuickReplies(options) {
+  quick.innerHTML = '';
+  if (!options?.length) { quick.style.display='none'; return; }
+  quick.style.display = 'flex';
+  options.forEach(o => {
+    const btn = document.createElement('button');
+    btn.className = 'qr'; btn.textContent = o;
+    btn.addEventListener('click', () => { quick.style.display='none'; send(o); });
+    quick.appendChild(btn);
+  });
+}
+
+function enableInput(placeholder = "Napisz wiadomość...") {
+  textarea.placeholder = placeholder;
+  textarea.disabled = false;
+  sendBtn.disabled = false;
+  textarea.focus();
+}
+
+// ── Połączenie z Cloudflare Worker ────────────────────────────────────────
+async function callGemini(msgs) {
+  const C = SALON_CONFIG;
+  if (!C.proxyUrl) throw new Error('Brak URL proxy');
+
+  const cleanUrl = C.proxyUrl.trim().replace(/\/$/, "") + "/";
+  const messagesToSend = [
+    { role: 'system', content: window.SYSTEM_PROMPT },
+    ...msgs.map(m => ({
+      role: m.role === 'assistant' ? 'assistant' : 'user',
+      content: m.content
+    }))
+  ];
+
+  const res = await fetch(cleanUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: C.model || 'meta-llama/llama-3.2-3b-instruct:free',
+      messages: messagesToSend,
+      max_tokens: 350,
+      temperature: 0.75
+    })
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || `Błąd serwera: Status ${res.status}`);
+  }
+  const data = await res.json();
+  return data.choices?.[0]?.message?.content || '(brak odpowiedzi)';
+}
+
+// ── Send message ──────────────────────────────────────────────────────────
+async function send(text) {
+  if (isLoading || !text.trim()) return;
+  isLoading = true;
+  sendBtn.disabled = true;
+  quick.style.display = 'none';
+
+  addMsg('user', text);
+  history.push({ role: 'user', content: text });
+
+  if (waitingForContact) {
+    waitingForContact = false;
+    await new Promise(r => setTimeout(r, 600));
+    addMsg('bot', "Doskonale! Twoje dane zostały przekazane. Skontaktujemy się z Tobą telefonicznie w celu potwierdzenia rezerwacji. Do zobaczenia! 🌸");
+    isLoading = false;
+    sendBtn.disabled = false;
+    textarea.value = '';
+    return;
+  }
+
+  showTyping();
+  try {
+    let reply = await callGemini(history);
+    removeTyping();
+
+    if (reply.includes('[COLLECT_CONTACT]')) {
+      reply = reply.replace('[COLLECT_CONTACT]', '');
+      addMsg('bot', reply.trim());
+      history.push({ role: 'assistant', content: reply });
+      if (!consentGiven) {
+        consent.style.display = 'block';
+        textarea.disabled = true;
+        sendBtn.disabled = true;
+      }
+    } else {
+      addMsg('bot', reply);
+      history.push({ role: 'assistant', content: reply });
+
+      const low = reply.toLowerCase();
+      if (low.includes('typ sk') || low.includes('cera')) {
+        setQuickReplies(['Cera tłusta / mieszana','Cera sucha / wrażliwa','Cera normalna','Nie wiem 🤷‍♀️']);
+      } else if (low.includes('problem') || low.includes('przeszkadza')) {
+        setQuickReplies(['Niedoskonałości i pory','Zmarszczki','Szary wygląd','Relaks i odprężenie']);
+      }
+    }
+  } catch(err) {
+    removeTyping();
+    addMsg('bot', `Przepraszam, wystąpił problem z połączeniem. Zadzwoń do nas: ${SALON_CONFIG.phone} 📞`);
+  }
+
+  isLoading = false;
+  sendBtn.disabled = false;
+  textarea.value = '';
+  textarea.style.height = 'auto';
+}
+
+// ── Start chat ────────────────────────────────────────────────────────────
+async function startChat() {
+  showTyping();
+  isLoading = true;
+  try {
+    const greeting = await callGemini([{ role:'user', content:'Przywitaj się krótko i zapytaj czego szukam' }]);
+    removeTyping();
+    addMsg('bot', greeting);
+    history.push({ role:'user', content:'Przywitaj się krótko i zapytaj czego szukam' });
+    history.push({ role:'assistant', content: greeting });
+    setQuickReplies(['Zabieg na twarz','Manicure / pedicure','Chcę się odprężyć','Co polecacie?']);
+    enableInput();
+  } catch(e) {
+    removeTyping();
+    addMsg('bot', 'Hej! Mam chwilowy problem techniczny. Napisz do nas bezpośrednio lub zadzwoń 🌸');
+    enableInput();
+  }
+  isLoading = false;
+}
+
+// ── Input events ──────────────────────────────────────────────────────────
+sendBtn.addEventListener('click', () => send(textarea.value.trim()));
+textarea.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(textarea.value.trim()); }
+});
+textarea.addEventListener('input', () => {
+  textarea.style.height = 'auto';
+  textarea.style.height = Math.min(textarea.scrollHeight, 100) + 'px';
+});
+
+setTimeout(() => {
+  if (!widget.classList.contains('open')) notifDot.style.display = 'block';
+}, 3000);
+</script>
+</body>
+</html>
