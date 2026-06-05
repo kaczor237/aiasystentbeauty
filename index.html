@@ -290,12 +290,12 @@ const SALON_CONFIG = {
 
   // ── API ──────────────────────────────────────────────────────────────────
   // URL proxy Cloudflare Workers (klucz OpenRouter siedzi tam bezpiecznie)
-  proxyUrl: "https://gemini-proxy2.kaczor237fb.workers.dev",   // np. "https://gemini-proxy2.kaczor237fb.workers.dev"
+  proxyUrl: "https://gemini-proxy2.kaczor237fb.workers.dev",
   // Model (darmowe opcje na OpenRouter):
   // "google/gemma-3-12b-it:free"
   // "mistralai/mistral-7b-instruct:free"
   // "meta-llama/llama-3.1-8b-instruct:free"
-  model: "google/gemma-3-12b-it:free",
+ model: "meta-llama/llama-3.2-3b-instruct:free",
 
   // ── Oferta salonu ────────────────────────────────────────────────────────
   // Dodaj lub usuń zabiegi. Format: { name, price, duration, description }
@@ -509,6 +509,9 @@ async function callGemini(msgs) {
     throw new Error('Brak URL proxy w konfiguracji');
   }
 
+  // Czyścimy adres url z ewentualnych spacji lub końcowych ukośników
+  const cleanUrl = C.proxyUrl.trim().replace(/\/$/, "");
+
   const messages = [
     { role: 'system', content: window.SYSTEM_PROMPT },
     ...msgs.map(m => ({
@@ -517,11 +520,13 @@ async function callGemini(msgs) {
     }))
   ];
 
-  const res = await fetch(C.proxyUrl, {
+  console.log("Wysyłam zapytanie do:", cleanUrl);
+
+  const res = await fetch(cleanUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: C.model || 'google/gemma-3-12b-it:free',
+      model: C.model || 'meta-llama/llama-3.2-3b-instruct:free',
       messages,
       max_tokens: 350,
       temperature: 0.75
@@ -529,8 +534,8 @@ async function callGemini(msgs) {
   });
 
   if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.error?.message || 'Błąd API');
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || `Błąd serwera: Status ${res.status}`);
   }
   const data = await res.json();
   return data.choices?.[0]?.message?.content || '(brak odpowiedzi)';
