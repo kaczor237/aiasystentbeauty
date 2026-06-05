@@ -266,9 +266,6 @@
 </head>
 <body>
 
-<!-- ════════════════════════════════════════════════════════════════════════
-     KONFIGURACJA SALONU
-════════════════════════════════════════════════════════════════════════ -->
 <script>
 const SALON_CONFIG = {
   name:          "Lumière Beauty",          
@@ -284,32 +281,16 @@ const SALON_CONFIG = {
   colorPrimary:  "#c9907a",                 
   colorDark:     "#a8705c",                 
 
-  // URL proxy Cloudflare Workers
-  proxyUrl:      "https://gemini-proxy2.kaczor237fb.workers.dev",   
-  model:         "deepseek/deepseek-chat:free",
-
-  services: [
-    { name: "Oczyszczanie wodorowe",      price: 180, duration: "60 min", description: "Głębokie oczyszczanie porów, nawilżenie, redukcja niedoskonałości." },
-    { name: "Peeling kawitacyjny",        price: 150, duration: "45 min", description: "Złuszczanie martwego naskórka, wygładzenie i rozświetlenie cery." },
-    { name: "Mikrodermabrazja diamentowa",price: 200, duration: "60 min", description: "Redukcja blizn, przebarwień i płytkich zmarszczek." },
-    { name: "Masaż twarzy Kobido",        price: 220, duration: "75 min", description: "Japoński lifting twarzy, relaksacja mięśni, efekt młodości." },
-    { name: "Laminowanie rzęs",           price: 160, duration: "90 min", description: "Podkręcenie i odżywienie rzęs bez sztucznych przedłużeń." },
-    { name: "Lifting brwi + henna pudrowa",price: 120, duration: "60 min", description: "Regulacja, lifting i koloryzacja brwi metodą pudrową." },
-    { name: "Manicure hybrydowy",         price: 130, duration: "75 min", description: "Lakier hybrydowy z pielęgnacją płytek i skórek." },
-    { name: "Pedicure SPA",               price: 150, duration: "90 min", description: "Kompleksowa pielęgnacja stóp z kąpielą i masażem." },
-  ],
-
-  extraInfo: "Salon czynny: pon-pt 9:00-20:00, sob 9:00-16:00. Przyjmujemy płatności kartą i gotówką. Parking bezpłatny przed salonem. Pierwsza wizyta -10%."
+  // URL Twojego Cloudflare Workera obsługującego klucze AQ...
+  proxyUrl:      "https://gemini-proxy2.kaczor237fb.workers.dev"   
 };
 </script>
 
-<!-- Floating button -->
 <button id="chatToggle" aria-label="Otwórz konsultanta AI">
   <span id="toggleEmoji">🌸</span>
   <div class="notif-dot" id="notifDot"></div>
 </button>
 
-<!-- Widget -->
 <div id="chatWidget" role="dialog" aria-label="Konsultant AI">
   <div class="demo-notice" id="demoNotice">
     🔧 DEMO – usuń ten pasek w wersji produkcyjnej
@@ -327,7 +308,6 @@ const SALON_CONFIG = {
   <div class="wg-messages" id="wgMessages"></div>
   <div class="wg-quick" id="wgQuick" style="display:none"></div>
 
-  <!-- RODO consent -->
   <div class="wg-consent" id="wgConsent">
     <p>Aby przekazać Twoje dane do salonu, potrzebujemy Twojej zgody:</p>
     <label>
@@ -360,7 +340,18 @@ const SALON_CONFIG = {
   document.getElementById('consentSalonName').textContent = C.name;
   document.getElementById('consentPrivacyLink').href = C.privacyUrl;
 
-  const serviceList = C.services.map(s => `• ${s.name} – ${s.price} zł, ${s.duration}`).join('\n');
+  const services = [
+    { name: "Oczyszczanie wodorowe",      price: 180, duration: "60 min" },
+    { name: "Peeling kawitacyjny",        price: 150, duration: "45 min" },
+    { name: "Mikrodermabrazja diamentowa",price: 200, duration: "60 min" },
+    { name: "Masaż twarzy Kobido",        price: 220, duration: "75 min" },
+    { name: "Laminowanie rzęs",           price: 160, duration: "90 min" },
+    { name: "Lifting brwi + henna pudrowa",price: 120, duration: "60 min" },
+    { name: "Manicure hybrydowy",         price: 130, duration: "75 min" },
+    { name: "Pedicure SPA",               price: 150, duration: "90 min" }
+  ];
+
+  const serviceList = services.map(s => `• ${s.name} – ${s.price} zł, ${s.duration}`).join('\n');
 
   window.SYSTEM_PROMPT = "Jesteś " + C.botName + " - profesjonalną konsultantką AI salonu " + C.name + " w " + C.city + ". Oferta:\n" + serviceList + "\nStyl: Ciepły, pomocny, max 3 zdania. Gdy klient chce rezerwować, użyj tokenu [COLLECT_CONTACT].";
 })();
@@ -450,7 +441,7 @@ function enableInput(placeholder = "Napisz wiadomość...") {
   textarea.focus();
 }
 
-// ── Połączenie z Cloudflare Worker ────────────────────────────────────────
+// ── Połączenie z Cloudflare Worker (Nowy ustandaryzowany payload) ──────────
 async function callGemini(msgs) {
   const C = SALON_CONFIG;
   if (!C.proxyUrl) throw new Error('Brak URL proxy');
@@ -468,10 +459,7 @@ async function callGemini(msgs) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: C.model || 'google/gemini-2.5-flash:free',
-      messages: messagesToSend,
-      max_tokens: 350,
-      temperature: 0.75
+      messages: messagesToSend
     })
   });
 
