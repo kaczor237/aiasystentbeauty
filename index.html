@@ -501,13 +501,44 @@ function enableInput(placeholder = "Napisz wiadomość...") {
   textarea.focus();
 }
 
-// ── OpenRouter API call (przez proxy Cloudflare) ─────────────────────────
+// ── TEST BEZPOŚREDNIEGO POŁĄCZENIA Z OPENROUTER ─────────────────────────
 async function callGemini(msgs) {
-  const C = SALON_CONFIG;
+  // UWAGA: Wklej swój klucz API pomiędzy cudzysłowy poniżej (zaczyna się od sk-or-...)
+  const TEST_API_KEY = "TUTAJ_WKLEJ_SWÓJ_KLUCZ_OPENROUTER";
 
-  if (!C.proxyUrl) {
-    throw new Error('Brak URL proxy w konfiguracji');
+  const messages = [
+    { role: 'system', content: window.SYSTEM_PROMPT },
+    ...msgs.map(m => ({
+      role: m.role === 'assistant' ? 'assistant' : 'user',
+      content: m.content
+    }))
+  ];
+
+  console.log("Próba bezpośredniego połączenia z OpenRouter...");
+
+  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: 'POST',
+    headers: { 
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${TEST_API_KEY}`,
+      'HTTP-Referer': 'https://kaczor237.github.io/aiasystentbeauty/',
+      'X-Title': 'Test bota'
+    },
+    body: JSON.stringify({
+      model: "meta-llama/llama-3.2-3b-instruct:free",
+      messages,
+      max_tokens: 350,
+      temperature: 0.75
+    })
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || `Błąd serwera: Status ${res.status}`);
   }
+  const data = await res.json();
+  return data.choices?.[0]?.message?.content || '(brak odpowiedzi)';
+}
 
   // Czyścimy adres url z ewentualnych spacji lub końcowych ukośników
   const cleanUrl = C.proxyUrl.trim().replace(/\/$/, "");
