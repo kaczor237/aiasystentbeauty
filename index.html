@@ -289,10 +289,13 @@ const SALON_CONFIG = {
   colorDark:     "#a8705c",                 // ciemniejszy akcent
 
   // ── API ──────────────────────────────────────────────────────────────────
-  // OPCJA A – proxy Cloudflare Workers (ZALECANE, klucz ukryty):
-  proxyUrl:      "",   // np. "https://-proxy.twoja.workers.dev"
-  // OPCJA B – klucz bezpośrednio (tylko na demo/localhost, NIE na produkcji):
-  geminiKeyDev:  "AQ.Ab8RN6K5CqwUbP_1i1RvnbRhtmeHtGK_PWR10orMIfHsVbvpGg",   // wklej klucz tylko lokalnie
+  // URL proxy Cloudflare Workers (klucz OpenRouter siedzi tam bezpiecznie)
+  proxyUrl:      "https://gemini-proxy2.kaczor237fb.workers.dev",   // np. "https://gemini-proxy2.kaczor237fb.workers.dev"
+  // Model (darmowe opcje na OpenRouter):
+  // "google/gemma-3-12b-it:free"
+  // "mistralai/mistral-7b-instruct:free"
+  // "meta-llama/llama-3.1-8b-instruct:free"
+  model: "google/gemma-3-12b-it:free",
 
   // ── Oferta salonu ────────────────────────────────────────────────────────
   // Dodaj lub usuń zabiegi. Format: { name, price, duration, description }
@@ -498,27 +501,31 @@ function enableInput(placeholder = "Napisz wiadomość...") {
   textarea.focus();
 }
 
-// ── Gemini API call ───────────────────────────────────────────────────────
+// ── OpenRouter API call (przez proxy Cloudflare) ─────────────────────────
 async function callGemini(msgs) {
   const C = SALON_CONFIG;
-  const url = C.proxyUrl
-    ? C.proxyUrl           // produkcja – proxy Workers
-    : `https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash-lite:generateContent?key=${C.geminiKeyDev}`;
 
-  const body = {
-    system_instruction: { parts: [{ text: window.SYSTEM_PROMPT }] },
-    contents: msgs.map(m => ({
-      role: m.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: m.content }]
-    })),
-    generationConfig: { temperature: 0.75, maxOutputTokens: 350 }
-  };
+  if (!C.proxyUrl) {
+    throw new Error('Brak URL proxy w konfiguracji');
+  }
 
-  // Przy proxy wysyłamy inaczej (bez systemu w URL, bo proxy to obsługuje)
-  const res = await fetch(url, {
+  const messages = [
+    { role: 'system', content: window.SYSTEM_PROMPT },
+    ...msgs.map(m => ({
+      role: m.role === 'assistant' ? 'assistant' : 'user',
+      content: m.content
+    }))
+  ];
+
+  const res = await fetch(C.proxyUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(C.proxyUrl ? body : body)
+    body: JSON.stringify({
+      model: C.model || 'google/gemma-3-12b-it:free',
+      messages,
+      max_tokens: 350,
+      temperature: 0.75
+    })
   });
 
   if (!res.ok) {
@@ -526,7 +533,7 @@ async function callGemini(msgs) {
     throw new Error(err.error?.message || 'Błąd API');
   }
   const data = await res.json();
-  return data.candidates?.[0]?.content?.parts?.[0]?.text || '(brak odpowiedzi)';
+  return data.choices?.[0]?.message?.content || '(brak odpowiedzi)';
 }
 
 // ── Send message ──────────────────────────────────────────────────────────
