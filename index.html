@@ -1303,18 +1303,18 @@ function setQR(opts) {
 async function callAPI(msgs) {
   const C = SALON_CONFIG;
   if (!C.proxyUrl) throw new Error('Brak URL proxy – skonfiguruj proxyUrl w SALON_CONFIG');
+  const messages = [
+    { role: 'system', content: window.SYSTEM_PROMPT },
+    ...msgs.map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content }))
+  ];
   const res = await fetch(C.proxyUrl, {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({
-      system_instruction:{parts:[{text:window.SYSTEM_PROMPT}]},
-      contents: msgs.map(m=>({role:m.role==='assistant'?'model':'user',parts:[{text:m.content}]})),
-      generationConfig:{temperature:0.75,maxOutputTokens:350}
-    })
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ messages })
   });
-  if (!res.ok){const e=await res.json();throw new Error(e.error?.message||'Błąd API');}
-  const d=await res.json();
-  return d.candidates?.[0]?.content?.parts?.[0]?.text || '(brak odpowiedzi)';
+  if (!res.ok) { const e = await res.json(); throw new Error(e.error?.message || 'Błąd API'); }
+  const d = await res.json();
+  return d.choices?.[0]?.message?.content || '(brak odpowiedzi)';
 }
 
 async function send(text) {
